@@ -75,12 +75,7 @@ function sendDailyNewsDigest() {
 
     const top3 = selectTop3(allArticles);
     Logger.log('Top 3: ' + top3.map(a => a.title).join(' | '));
-
-    // Resolve Google News redirect URLs → actual article URLs
-    top3.forEach(article => {
-      article.link = resolveGoogleNewsUrl(article.link);
-    });
-    Logger.log('링크 해석 완료: ' + top3.map(a => a.link).join(' | '));
+    Logger.log('링크: ' + top3.map(a => a.link).join(' | '));
 
     const enriched = generateDigestWithGemini(top3);
     const htmlBody = buildEmailHTML(enriched);
@@ -100,38 +95,52 @@ function sendDailyNewsDigest() {
 }
 
 // ============================================================
-// 뉴스 수집 - Google News RSS
+// 뉴스 수집 - Bing News RSS (실제 기사 URL 직접 반환)
 // ============================================================
 function fetchNewsFromRSS() {
   const articles = [];
 
   for (const query of SEARCH_QUERIES) {
     try {
-      const encodedQuery = encodeURIComponent(query + ' when:1d');
-      const rssUrl = 'https://news.google.com/rss/search?q=' + encodedQuery + '&hl=en&gl=US&ceid=US:en';
+      const encodedQuery = encodeURIComponent(query);
+      // Bing News RSS는 <link>에 실제 기사 URL을 직접 반환
+      const rssUrl = 'https://www.bing.com/news/search?q=' + encodedQuery + '&format=rss&mkt=en-US';
       const response = UrlFetchApp.fetch(rssUrl, { muteHttpExceptions: true });
 
-      if (response.getResponseCode() !== 200) continue;
+      if (response.getResponseCode() !== 200) {
+        Logger.log('Bing RSS 오류 (' + query + '): HTTP ' + response.getResponseCode());
+        continue;
+      }
 
       const xml = XmlService.parse(response.getContentText());
-      const items = xml.getRootElement().getChild('channel').getChildren('item');
+      const channel = xml.getRootElement().getChild('channel');
+      if (!channel) continue;
+      const items = channel.getChildren('item');
+
+      // 최근 48시간 기사 필터링 (여유있게)
+      const twoDaysAgo = new Date(Date.now() - 48 * 60 * 60 * 1000);
 
       for (const item of items) {
         const title = item.getChildText('title') || '';
-        const link = item.getChildText('link') || '';
+        const rawLink = item.getChildText('link') || '';
         const pubDate = item.getChildText('pubDate') || '';
-        const source = item.getChildText('source') || '';
-
-        // Try to get actual article URL from <description> HTML content
-        // Google News description contains: <a href="ACTUAL_URL">title</a> - Source
         const description = item.getChildText('description') || '';
-        const hrefMatch = description.match(/href="([^"]+)"/);
-        const articleUrl = (hrefMatch && hrefMatch[1] && !hrefMatch[1].includes('news.google.com'))
-          ? hrefMatch[1]
-          : link;
 
-        if (articles.some(a => a.title === title)) continue;
-        articles.push({ title, link: articleUrl, pubDate, source, query });
+        // pubDate 필터 (48시간 이내)
+        const pub = new Date(pubDate);
+        if (pub < twoDaysAgo) continue;
+
+        // Bing 리다이렉트 URL에서 실제 기사 URL 추출
+        // 형태: http://www.bing.com/news/apiclick.aspx?...&url=ENCODED_URL&...
+        const urlParam = rawLink.match(/[?&]url=([^&]+)/);
+        const link = urlParam ? decodeURIComponent(urlParam[1]) : rawLink;
+
+        // source: description 끝부분에서 추출 시도
+        const sourceMatch = description.match(/[-–]\s*([^-–<]{3,40})\s*$/);
+        const source = sourceMatch ? sourceMatch[1].trim() : (link.match(/^https?:\/\/(?:www\.)?([^\/]+)/) || ['', link])[1];
+
+        if (!title || articles.some(a => a.title === title)) continue;
+        articles.push({ title, link, pubDate, source, query });
       }
     } catch (e) {
       Logger.log('RSS 오류 (' + query + '): ' + e.message);
@@ -139,31 +148,6 @@ function fetchNewsFromRSS() {
   }
 
   return articles;
-}
-
-// ============================================================
-// Google News 리다이렉트 URL → 실제 기사 URL 변환
-// ============================================================
-function resolveGoogleNewsUrl(url) {
-  if (!url.includes('news.google.com')) return url; // already resolved
-  try {
-    const response = UrlFetchApp.fetch(url, {
-      followRedirects: false,
-      muteHttpExceptions: true
-    });
-    const code = response.getResponseCode();
-    if (code >= 300 && code < 400) {
-      const headers = response.getHeaders();
-      const location = headers['Location'] || headers['location'];
-      if (location && !location.includes('news.google.com')) {
-        Logger.log('URL 해석 성공: ' + url.substring(0, 60) + ' → ' + location.substring(0, 80));
-        return location;
-      }
-    }
-  } catch (e) {
-    Logger.log('URL 해석 실패: ' + e.message);
-  }
-  return url;
 }
 
 // ============================================================
