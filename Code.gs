@@ -76,6 +76,12 @@ function sendDailyNewsDigest() {
     const top3 = selectTop3(allArticles);
     Logger.log('Top 3: ' + top3.map(a => a.title).join(' | '));
 
+    // Resolve Google News redirect URLs → actual article URLs
+    top3.forEach(article => {
+      article.link = resolveGoogleNewsUrl(article.link);
+    });
+    Logger.log('링크 해석 완료: ' + top3.map(a => a.link).join(' | '));
+
     const enriched = generateDigestWithGemini(top3);
     const htmlBody = buildEmailHTML(enriched);
 
@@ -116,8 +122,16 @@ function fetchNewsFromRSS() {
         const pubDate = item.getChildText('pubDate') || '';
         const source = item.getChildText('source') || '';
 
+        // Try to get actual article URL from <description> HTML content
+        // Google News description contains: <a href="ACTUAL_URL">title</a> - Source
+        const description = item.getChildText('description') || '';
+        const hrefMatch = description.match(/href="([^"]+)"/);
+        const articleUrl = (hrefMatch && hrefMatch[1] && !hrefMatch[1].includes('news.google.com'))
+          ? hrefMatch[1]
+          : link;
+
         if (articles.some(a => a.title === title)) continue;
-        articles.push({ title, link, pubDate, source, query });
+        articles.push({ title, link: articleUrl, pubDate, source, query });
       }
     } catch (e) {
       Logger.log('RSS 오류 (' + query + '): ' + e.message);
@@ -125,6 +139,31 @@ function fetchNewsFromRSS() {
   }
 
   return articles;
+}
+
+// ============================================================
+// Google News 리다이렉트 URL → 실제 기사 URL 변환
+// ============================================================
+function resolveGoogleNewsUrl(url) {
+  if (!url.includes('news.google.com')) return url; // already resolved
+  try {
+    const response = UrlFetchApp.fetch(url, {
+      followRedirects: false,
+      muteHttpExceptions: true
+    });
+    const code = response.getResponseCode();
+    if (code >= 300 && code < 400) {
+      const headers = response.getHeaders();
+      const location = headers['Location'] || headers['location'];
+      if (location && !location.includes('news.google.com')) {
+        Logger.log('URL 해석 성공: ' + url.substring(0, 60) + ' → ' + location.substring(0, 80));
+        return location;
+      }
+    }
+  } catch (e) {
+    Logger.log('URL 해석 실패: ' + e.message);
+  }
+  return url;
 }
 
 // ============================================================
