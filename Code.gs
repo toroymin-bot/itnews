@@ -3,7 +3,9 @@
 // 매일 아침 Top 3 AI/Data 뉴스를 한국어+영어로 이메일 발송
 // ============================================================
 
-const GEMINI_API_KEY = 'AIzaSyANYllMyXwEdxVs6ErPQiRrQbGVz46ISic';
+// API 키는 GAS Script Properties에 저장 (코드에 노출 방지)
+// 설정: GAS 에디터 → 프로젝트 설정 → 스크립트 속성 → GEMINI_API_KEY 추가
+const GEMINI_API_KEY = PropertiesService.getScriptProperties().getProperty('GEMINI_API_KEY') || '';
 const RECIPIENT_EMAIL = 'toroymin@gmail.com';
 
 const SEARCH_QUERIES = [
