@@ -85,9 +85,9 @@ function sendDailyNewsDigest() {
     const enriched = generateDigestWithGemini(top3);
 
     // TTS 음성 브리핑 생성 (GOOGLE_TTS_API_KEY 설정 시)
-    const audioBlob = generateTTSAudio(enriched);
+    const audioBlobs = generateTTSAudio(enriched);
 
-    const htmlBody = buildEmailHTML(enriched, !!audioBlob);
+    const htmlBody = buildEmailHTML(enriched, !!audioBlobs);
 
     const today = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
     const emailOptions = {
@@ -95,7 +95,7 @@ function sendDailyNewsDigest() {
       name: 'AI & Data News Bot',
       charset: 'UTF-8'
     };
-    if (audioBlob) emailOptions.attachments = [audioBlob];
+    if (audioBlobs) emailOptions.attachments = audioBlobs;
 
     GmailApp.sendEmail(RECIPIENT_EMAIL, '[Daily AI & Data News] Top 3 뉴스 - ' + today, '', emailOptions);
 
@@ -262,6 +262,7 @@ IMPORTANT: Return ONLY the JSON array. No markdown, no code blocks, no extra tex
 
 // ============================================================
 // TTS 음성 브리핑 생성 - Google Cloud Text-to-Speech API
+// 한국어(ko-KR-Neural2-A) + 영어(en-US-Neural2-F) 각각 MP3 첨부
 // ============================================================
 function generateTTSAudio(articles) {
   if (!GOOGLE_TTS_API_KEY) {
@@ -271,36 +272,59 @@ function generateTTSAudio(articles) {
 
   const today = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy년 MM월 dd일');
 
-  let script = today + ' Daily AI Data News 브리핑입니다.\n\n';
-  articles.forEach((article, i) => {
-    script += (i + 1) + '번째 기사. ' + (article.titleKo || article.title) + '.\n';
-    script += (article.summaryKo || '') + '\n';
-    script += '쉬운 예시. ' + (article.exampleKo || '') + '\n\n';
+  // 한국어 스크립트
+  let koScript = today + ' AI Data News 브리핑입니다.\n\n';
+  articles.forEach((a, i) => {
+    koScript += (i + 1) + '번째 기사. ' + (a.titleKo || a.title) + '.\n';
+    koScript += (a.summaryKo || '') + '\n';
+    koScript += '쉬운 예시. ' + (a.exampleKo || '') + '\n\n';
   });
-  script += '이상 오늘의 AI Data News 브리핑이었습니다. 좋은 하루 되세요!';
+  koScript += '이상 오늘의 AI Data News 브리핑이었습니다. 좋은 하루 되세요!';
 
+  // 영어 스크립트
+  let enScript = "Today's AI Data News briefing.\n\n";
+  articles.forEach((a, i) => {
+    enScript += 'Article ' + (i + 1) + '. ' + (a.titleEn || a.title) + '.\n';
+    enScript += (a.summaryEn || '') + '\n';
+    enScript += 'Easy example. ' + (a.exampleEn || '') + '\n\n';
+  });
+  enScript += "That's all for today's briefing. Have a great day!";
+
+  const blobs = [];
+
+  const koBytes = callTTS(koScript, 'ko-KR', 'ko-KR-Neural2-A', 1.1);
+  if (koBytes) {
+    blobs.push(Utilities.newBlob(koBytes, 'audio/mpeg', '브리핑-한국어.mp3'));
+    Logger.log('한국어 TTS 완료 (' + Math.round(koBytes.length / 1024) + ' KB)');
+  }
+
+  const enBytes = callTTS(enScript, 'en-US', 'en-US-Neural2-F', 1.1);
+  if (enBytes) {
+    blobs.push(Utilities.newBlob(enBytes, 'audio/mpeg', 'briefing-english.mp3'));
+    Logger.log('영어 TTS 완료 (' + Math.round(enBytes.length / 1024) + ' KB)');
+  }
+
+  return blobs.length > 0 ? blobs : null;
+}
+
+function callTTS(text, languageCode, voiceName, speakingRate) {
+  const url = 'https://texttospeech.googleapis.com/v1/text:synthesize?key=' + GOOGLE_TTS_API_KEY;
   try {
-    const url = 'https://texttospeech.googleapis.com/v1/text:synthesize?key=' + GOOGLE_TTS_API_KEY;
     const response = UrlFetchApp.fetch(url, {
       method: 'post',
       contentType: 'application/json',
       payload: JSON.stringify({
-        input: { text: script },
-        voice: { languageCode: 'ko-KR', name: 'ko-KR-Neural2-A' },
-        audioConfig: { audioEncoding: 'MP3', speakingRate: 1.1 }
+        input: { text: text },
+        voice: { languageCode: languageCode, name: voiceName },
+        audioConfig: { audioEncoding: 'MP3', speakingRate: speakingRate || 1.0 }
       }),
       muteHttpExceptions: true
     });
-
     const json = JSON.parse(response.getContentText());
     if (json.error) throw new Error(json.error.message);
-
-    const audioBytes = Utilities.base64Decode(json.audioContent);
-    const blob = Utilities.newBlob(audioBytes, 'audio/mpeg', 'daily-ai-briefing.mp3');
-    Logger.log('TTS 음성 생성 완료 (' + Math.round(audioBytes.length / 1024) + ' KB)');
-    return blob;
+    return Utilities.base64Decode(json.audioContent);
   } catch (e) {
-    Logger.log('TTS 실패: ' + e.message);
+    Logger.log('TTS 오류 (' + languageCode + '): ' + e.message);
     return null;
   }
 }
@@ -348,8 +372,9 @@ function buildEmailHTML(articles, hasAudio) {
   });
 
   const audioBadge = hasAudio ? `
-    <div style="background: #f0f4ff; border: 1px solid #c7d7ff; border-radius: 8px; padding: 12px 16px; margin-top: 12px; text-align: center; font-size: 14px; color: #3a5fc8;">
-      &#x1F3A7; <strong>음성 브리핑 첨부됨</strong> &mdash; 첨부파일 <code>daily-ai-briefing.mp3</code>를 출퇴근 시 청취하세요
+    <div style="background: #f0f4ff; border: 1px solid #c7d7ff; border-radius: 8px; padding: 14px 20px; margin-top: 12px; text-align: center; font-size: 14px; color: #3a5fc8; line-height: 1.8;">
+      &#x1F3A7; <strong>음성 브리핑 첨부됨</strong> &mdash; 출퇴근 시 청취하세요<br>
+      <span style="font-size: 13px; color: #666;">&#x1F1F0;&#x1F1F7; 브리핑-한국어.mp3 &nbsp;|&nbsp; &#x1F1FA;&#x1F1F8; briefing-english.mp3</span>
     </div>` : '';
 
   return `<html><head><meta charset="UTF-8"></head><body style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 700px; margin: 0 auto; color: #333;">
