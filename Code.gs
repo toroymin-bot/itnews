@@ -4,8 +4,11 @@
 // ============================================================
 
 // API 키는 GAS Script Properties에 저장 (코드에 노출 방지)
-// 설정: GAS 에디터 → 프로젝트 설정 → 스크립트 속성 → GEMINI_API_KEY 추가
+// 설정: GAS 에디터 → 프로젝트 설정 → 스크립트 속성 추가
+//   GEMINI_API_KEY  : Google AI Studio (aistudio.google.com/apikey)
+//   GOOGLE_TTS_API_KEY : Google Cloud Console → Cloud Text-to-Speech API 활성화 후 발급
 const GEMINI_API_KEY = PropertiesService.getScriptProperties().getProperty('GEMINI_API_KEY') || '';
+const GOOGLE_TTS_API_KEY = PropertiesService.getScriptProperties().getProperty('GOOGLE_TTS_API_KEY') || '';
 const RECIPIENT_EMAIL = 'toroymin@gmail.com';
 
 const SEARCH_QUERIES = [
@@ -80,14 +83,21 @@ function sendDailyNewsDigest() {
     Logger.log('링크: ' + top3.map(a => a.link).join(' | '));
 
     const enriched = generateDigestWithGemini(top3);
-    const htmlBody = buildEmailHTML(enriched);
+
+    // TTS 음성 브리핑 생성 (GOOGLE_TTS_API_KEY 설정 시)
+    const audioBlob = generateTTSAudio(enriched);
+
+    const htmlBody = buildEmailHTML(enriched, !!audioBlob);
 
     const today = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
-    GmailApp.sendEmail(RECIPIENT_EMAIL, '[Daily AI & Data News] Top 3 뉴스 - ' + today, '', {
+    const emailOptions = {
       htmlBody: htmlBody,
       name: 'AI & Data News Bot',
       charset: 'UTF-8'
-    });
+    };
+    if (audioBlob) emailOptions.attachments = [audioBlob];
+
+    GmailApp.sendEmail(RECIPIENT_EMAIL, '[Daily AI & Data News] Top 3 뉴스 - ' + today, '', emailOptions);
 
     Logger.log('이메일 발송 완료!');
   } catch (error) {
@@ -251,12 +261,57 @@ IMPORTANT: Return ONLY the JSON array. No markdown, no code blocks, no extra tex
 }
 
 // ============================================================
+// TTS 음성 브리핑 생성 - Google Cloud Text-to-Speech API
+// ============================================================
+function generateTTSAudio(articles) {
+  if (!GOOGLE_TTS_API_KEY) {
+    Logger.log('GOOGLE_TTS_API_KEY 없음. 음성 브리핑 건너뜀.');
+    return null;
+  }
+
+  const today = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy년 MM월 dd일');
+
+  let script = today + ' Daily AI Data News 브리핑입니다.\n\n';
+  articles.forEach((article, i) => {
+    script += (i + 1) + '번째 기사. ' + (article.titleKo || article.title) + '.\n';
+    script += (article.summaryKo || '') + '\n';
+    script += '쉬운 예시. ' + (article.exampleKo || '') + '\n\n';
+  });
+  script += '이상 오늘의 AI Data News 브리핑이었습니다. 좋은 하루 되세요!';
+
+  try {
+    const url = 'https://texttospeech.googleapis.com/v1/text:synthesize?key=' + GOOGLE_TTS_API_KEY;
+    const response = UrlFetchApp.fetch(url, {
+      method: 'post',
+      contentType: 'application/json',
+      payload: JSON.stringify({
+        input: { text: script },
+        voice: { languageCode: 'ko-KR', name: 'ko-KR-Neural2-A' },
+        audioConfig: { audioEncoding: 'MP3', speakingRate: 1.1 }
+      }),
+      muteHttpExceptions: true
+    });
+
+    const json = JSON.parse(response.getContentText());
+    if (json.error) throw new Error(json.error.message);
+
+    const audioBytes = Utilities.base64Decode(json.audioContent);
+    const blob = Utilities.newBlob(audioBytes, 'audio/mpeg', 'daily-ai-briefing.mp3');
+    Logger.log('TTS 음성 생성 완료 (' + Math.round(audioBytes.length / 1024) + ' KB)');
+    return blob;
+  } catch (e) {
+    Logger.log('TTS 실패: ' + e.message);
+    return null;
+  }
+}
+
+// ============================================================
 // HTML 이메일
 // Note: 이모지는 HTML 엔티티 사용 (GAS 4-byte UTF-8 인코딩 문제 방지)
 //   &#x1F5DE;&#xFE0F; = 🗞️  &#x1F1F0;&#x1F1F7; = 🇰🇷
 //   &#x1F1FA;&#x1F1F8; = 🇺🇸  &#x1F4A1; = 💡  &#x1F517; = 🔗
 // ============================================================
-function buildEmailHTML(articles) {
+function buildEmailHTML(articles, hasAudio) {
   const today = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy년 MM월 dd일');
   const todayEn = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'MMMM dd, yyyy');
 
@@ -292,11 +347,17 @@ function buildEmailHTML(articles) {
     </div>`;
   });
 
+  const audioBadge = hasAudio ? `
+    <div style="background: #f0f4ff; border: 1px solid #c7d7ff; border-radius: 8px; padding: 12px 16px; margin-top: 12px; text-align: center; font-size: 14px; color: #3a5fc8;">
+      &#x1F3A7; <strong>음성 브리핑 첨부됨</strong> &mdash; 첨부파일 <code>daily-ai-briefing.mp3</code>를 출퇴근 시 청취하세요
+    </div>` : '';
+
   return `<html><head><meta charset="UTF-8"></head><body style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 700px; margin: 0 auto; color: #333;">
     <div style="background: linear-gradient(135deg, #0078D4, #5C2D91); padding: 24px; border-radius: 12px 12px 0 0;">
       <h1 style="color: white; margin: 0; font-size: 22px;">&#x1F5DE;&#xFE0F; Daily AI &amp; Data News - Top 3</h1>
       <p style="color: #e0e0e0; margin: 8px 0 0 0; font-size: 14px;">${today} | ${todayEn}</p>
     </div>
+    ${audioBadge}
     ${newsHtml}
     <div style="padding: 16px; text-align: center; color: #999; font-size: 12px;">
       <p>Generated by Google Apps Script + Gemini AI</p>
