@@ -39,7 +39,7 @@ function sendBillingReport() {
       BR_RECIPIENT,
       '[Cloud AI Billing] 비용 리포트 - ' + today,
       '',
-      { htmlBody: html, name: 'Cloud Billing Bot', charset: 'UTF-8' }
+      { htmlBody: html, name: 'Google Cloud Billing Bot', charset: 'UTF-8' }
     );
     Logger.log('Billing report sent to ' + BR_RECIPIENT);
   } catch (e) {
