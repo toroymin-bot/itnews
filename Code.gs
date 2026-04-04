@@ -9,7 +9,7 @@
 //   GOOGLE_TTS_API_KEY : Google Cloud Console → Cloud Text-to-Speech API 활성화 후 발급
 const GEMINI_API_KEY = PropertiesService.getScriptProperties().getProperty('GEMINI_API_KEY') || '';
 const GOOGLE_TTS_API_KEY = PropertiesService.getScriptProperties().getProperty('GOOGLE_TTS_API_KEY') || '';
-const RECIPIENT_EMAIL = 'toroymin@gmail.com';
+const RECIPIENT_EMAIL = 'roy@ai4min.com';
 
 const SEARCH_QUERIES = [
   'AI artificial intelligence',
