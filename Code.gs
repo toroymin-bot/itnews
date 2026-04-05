@@ -454,3 +454,11 @@ function buildEmailHTML(articles, hasAudio) {
 function testSendEmail() {
   sendDailyNewsDigest();
 }
+
+// ============================================================
+// Script Properties 설정 (최초 1회만 실행 후 삭제)
+// ============================================================
+function setupScriptProperties() {
+  PropertiesService.getScriptProperties().setProperty('GEMINI_API_KEY', 'AIzaSyAwXOqQjX_sEDV9RJvv_Jv-MtUfkGgQsc0');
+  Logger.log('GEMINI_API_KEY 설정 완료');
+}
