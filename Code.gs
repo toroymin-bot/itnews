@@ -4,12 +4,13 @@
 // ============================================================
 
 const GEMINI_API_KEY = PropertiesService.getScriptProperties().getProperty('GEMINI_API_KEY') || '';
-const RECIPIENT_EMAIL = 'toroymin@gmail.com';
+const RECIPIENT_EMAIL = 'roy@ai4min.com';
 
 const SEARCH_QUERIES = [
   'AI artificial intelligence',
   'Azure data architecture Microsoft Fabric',
   'data engineering data architecture',
+  'IT technology cloud computing',
 ];
 
 // ============================================================
@@ -37,7 +38,8 @@ function sendDailyNewsDigest() {
 
     GmailApp.sendEmail(RECIPIENT_EMAIL, subject, '', {
       htmlBody: htmlBody,
-      name: 'AI & Data News Bot'
+      name: 'AI & Data News Bot',
+      charset: 'UTF-8'
     });
 
     Logger.log('✅ 이메일 발송 완료!');
@@ -202,6 +204,7 @@ function selectAndEnrichWithGemini(allArticles) {
     data: []
   };
 
+  var itFallback = [];
   for (var i = 0; i < allArticles.length; i++) {
     var a = allArticles[i];
     var q = a.query || '';
@@ -209,9 +212,16 @@ function selectAndEnrichWithGemini(allArticles) {
       groups.ai.push(a);
     } else if (q.indexOf('Azure') >= 0 || q.indexOf('Fabric') >= 0) {
       groups.azure.push(a);
+    } else if (q.indexOf('IT') >= 0 || q.indexOf('cloud computing') >= 0) {
+      itFallback.push(a);
     } else {
       groups.data.push(a);
     }
+  }
+  // Azure 기사 없으면 IT 일반 뉴스로 대체
+  if (groups.azure.length === 0) {
+    groups.azure = itFallback;
+    Logger.log('Azure 뉴스 없음 → IT 일반 뉴스로 대체: ' + itFallback.length + '개');
   }
 
   // 각 카테고리 최대 10개로 제한
@@ -377,12 +387,12 @@ function buildEmailHTML(articles) {
       '</div>' +
       '<h2 style="color: ' + color.text + '; margin: 8px 0; font-size: 18px;">' + (article.titleKo || article.title) + '</h2>' +
       '<h3 style="color: #555; font-weight: normal; font-size: 15px; margin-top: 4px;">' + (article.titleEn || article.title) + '</h3>' +
-      '<p style="line-height: 1.7;"><strong>🇰🇷 요약:</strong> ' + (article.summaryKo || article.title) + '</p>' +
-      '<p style="line-height: 1.7;"><strong>🇺🇸 Summary:</strong> ' + (article.summaryEn || article.title) + '</p>' +
+      '<p style="line-height: 1.7;"><strong>&#x1F1F0;&#x1F1F7; 요약:</strong> ' + (article.summaryKo || article.title) + '</p>' +
+      '<p style="line-height: 1.7;"><strong>&#x1F1FA;&#x1F1F8; Summary:</strong> ' + (article.summaryEn || article.title) + '</p>' +
       '<div style="background: #FFF8E1; padding: 16px; border-radius: 8px; border-left: 4px solid #FFC107; margin: 16px 0;">' +
-        '<strong>💡 쉬운 예시 | Easy Example:</strong><br><br>' +
-        '🇰🇷 ' + (article.exampleKo || '') + '<br><br>' +
-        '🇺🇸 ' + (article.exampleEn || '') +
+        '<strong>&#x1F4A1; 쉬운 예시 | Easy Example:</strong><br><br>' +
+        '&#x1F1F0;&#x1F1F7; ' + (article.exampleKo || '') + '<br><br>' +
+        '&#x1F1FA;&#x1F1F8; ' + (article.exampleEn || '') +
       '</div>' +
       '<p style="font-size: 13px; color: #888;">🔗 <a href="' + article.link + '" style="color: #0078D4;">' + (article.source || 'Source') + '</a></p>' +
     '</div>';
@@ -390,7 +400,7 @@ function buildEmailHTML(articles) {
 
   return '<html><body style="font-family: \'Segoe UI\', Arial, sans-serif; max-width: 700px; margin: 0 auto; color: #333;">' +
     '<div style="background: linear-gradient(135deg, #0078D4, #5C2D91); padding: 24px; border-radius: 12px 12px 0 0;">' +
-      '<h1 style="color: white; margin: 0; font-size: 22px;">🗞️ Daily AI & Data News - Top 3</h1>' +
+      '<h1 style="color: white; margin: 0; font-size: 22px;">&#x1F5DE;&#xFE0F; Daily AI & Data News - Top 3</h1>' +
       '<p style="color: #e0e0e0; margin: 8px 0 0 0; font-size: 14px;">' + today + ' | ' + todayEn + '</p>' +
     '</div>' +
     newsHtml +
