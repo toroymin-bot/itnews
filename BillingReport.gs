@@ -297,8 +297,8 @@ function buildBillingReportHTML(d) {
     setupMsg,
 
     // Section 1
-    '<div style="padding:8px 12px 4px;">',
-    '<div style="font-size:12px;font-weight:700;color:#0078D4;letter-spacing:0.5px;margin-bottom:6px;">&#x1F4B3;&nbsp; 기간별 누적 비용</div>',
+    '<div style="padding:0 12px 4px;">',
+    '<div style="font-size:12px;font-weight:700;color:#0078D4;letter-spacing:0.5px;margin-bottom:6px;margin-top:0;">&#x1F4B3;&nbsp; 기간별 누적 비용</div>',
     cardHtml,
     '</div>',
 
