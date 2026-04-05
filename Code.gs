@@ -228,7 +228,9 @@ function selectTop3WithGemini(allArticles) {
     if (json.error) throw new Error(json.error.message);
 
     const text = json.candidates[0].content.parts[0].text;
-    const results = JSON.parse(text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim());
+    const cleaned = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+    const arrMatch = cleaned.match(/\[[\s\S]*\]/);
+    const results = JSON.parse(arrMatch ? arrMatch[0] : cleaned);
 
     const lists = [aiList, azureList, dataList];
     const selected = results.map((r, i) => {
@@ -304,7 +306,9 @@ IMPORTANT: Return ONLY the JSON array. No markdown, no code blocks, no extra tex
     if (json.error) throw new Error(json.error.message);
 
     const text = json.candidates[0].content.parts[0].text;
-    const enriched = JSON.parse(text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim());
+    const cleaned2 = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+    const arrMatch2 = cleaned2.match(/\[[\s\S]*\]/);
+    const enriched = JSON.parse(arrMatch2 ? arrMatch2[0] : cleaned2);
     Logger.log('Gemini 요약 성공 (모델: ' + model + ')');
     return articles.map((a, i) => ({ ...a, ...(enriched[i] || {}) }));
   } catch (e) {
