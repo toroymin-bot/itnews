@@ -379,7 +379,7 @@ function buildEmailHTML(articles, hasAudio) {
 
   return `<html><head><meta charset="UTF-8"></head><body style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 700px; margin: 0 auto; color: #333;">
     <div style="background: linear-gradient(135deg, #0078D4, #5C2D91); padding: 24px; border-radius: 12px 12px 0 0;">
-      <h1 style="color: white; margin: 0; font-size: 22px;">&#x1F5DE;&#xFE0F; Daily AI &amp; Data News - Top 3 &nbsp;<span style="font-size: 13px; font-weight: normal; color: #000;">${today} | ${todayEn}</span></h1>
+      <h1 style="color: white; margin: 0; font-size: 22px;">Daily AI &amp; Data News - Top 3 &nbsp;<span style="font-size: 13px; font-weight: normal; color: #000;">${today} | ${todayEn}</span></h1>
     </div>
     ${audioBadge}
     ${newsHtml}
