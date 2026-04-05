@@ -294,13 +294,13 @@ function generateTTSAudio(articles) {
 
   const koBytes = callTTS(koScript, 'ko-KR', 'ko-KR-Neural2-A', 1.1);
   if (koBytes) {
-    blobs.push(Utilities.newBlob(koBytes, 'audio/mpeg', '브리핑-한국어.mp3'));
+    blobs.push(Utilities.newBlob(koBytes, 'audio/mpeg', '한국어.mp3'));
     Logger.log('한국어 TTS 완료 (' + Math.round(koBytes.length / 1024) + ' KB)');
   }
 
   const enBytes = callTTS(enScript, 'en-US', 'en-US-Neural2-F', 1.1);
   if (enBytes) {
-    blobs.push(Utilities.newBlob(enBytes, 'audio/mpeg', 'briefing-english.mp3'));
+    blobs.push(Utilities.newBlob(enBytes, 'audio/mpeg', 'english.mp3'));
     Logger.log('영어 TTS 완료 (' + Math.round(enBytes.length / 1024) + ' KB)');
   }
 
@@ -372,15 +372,14 @@ function buildEmailHTML(articles, hasAudio) {
   });
 
   const audioBadge = hasAudio ? `
-    <div style="background: #f0f4ff; border: 1px solid #c7d7ff; border-radius: 8px; padding: 14px 20px; margin-top: 12px; text-align: center; font-size: 14px; color: #3a5fc8; line-height: 1.8;">
-      &#x1F3A7; <strong>음성 브리핑 첨부됨</strong> &mdash; 출퇴근 시 청취하세요<br>
-      <span style="font-size: 13px; color: #666;">&#x1F1F0;&#x1F1F7; 브리핑-한국어.mp3 &nbsp;|&nbsp; &#x1F1FA;&#x1F1F8; briefing-english.mp3</span>
+    <div style="background: #f0f4ff; border: 1px solid #c7d7ff; border-radius: 8px; padding: 10px 16px; margin-top: 12px; text-align: center; font-size: 13px; color: #3a5fc8; line-height: 1.5;">
+      &#x1F3A7; <strong>음성 첨부됨</strong> &mdash; 출퇴근 시 청취하세요<br>
+      <span style="color: #555;">&#x1F1F0;&#x1F1F7; 한국어.mp3 &nbsp;|&nbsp; &#x1F1FA;&#x1F1F8; english.mp3</span>
     </div>` : '';
 
   return `<html><head><meta charset="UTF-8"></head><body style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 700px; margin: 0 auto; color: #333;">
     <div style="background: linear-gradient(135deg, #0078D4, #5C2D91); padding: 24px; border-radius: 12px 12px 0 0;">
-      <h1 style="color: white; margin: 0; font-size: 22px;">&#x1F5DE;&#xFE0F; Daily AI &amp; Data News - Top 3</h1>
-      <p style="color: #e0e0e0; margin: 8px 0 0 0; font-size: 14px;">${today} | ${todayEn}</p>
+      <h1 style="color: white; margin: 0; font-size: 22px;">&#x1F5DE;&#xFE0F; Daily AI &amp; Data News - Top 3 &nbsp;<span style="font-size: 13px; font-weight: normal; color: #000;">${today} | ${todayEn}</span></h1>
     </div>
     ${audioBadge}
     ${newsHtml}
