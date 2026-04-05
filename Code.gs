@@ -175,7 +175,7 @@ function selectTop3WithGemini(allArticles) {
       contentType: 'application/json',
       payload: JSON.stringify({
         contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: { temperature: 0.3, maxOutputTokens: 256 }
+        generationConfig: { temperature: 0.3, maxOutputTokens: 512 }
       }),
       muteHttpExceptions: true
     });
