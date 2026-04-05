@@ -67,7 +67,7 @@ function sendDailyNewsDigest() {
 }
 
 // ============================================================
-// 뉴스 수집 - Bing News RSS (실제 기사 URL 직접 반환)
+// 뉴스 수집 - Google News RSS (안정적, 카테고리별 풍부한 기사 제공)
 // ============================================================
 function fetchNewsFromRSS() {
   const articles = [];
@@ -75,12 +75,12 @@ function fetchNewsFromRSS() {
   for (const query of SEARCH_QUERIES) {
     try {
       const encodedQuery = encodeURIComponent(query);
-      // Bing News RSS는 <link>에 실제 기사 URL을 직접 반환
-      const rssUrl = 'https://www.bing.com/news/search?q=' + encodedQuery + '&format=rss&mkt=en-US';
+      // Google News RSS: 검색어 기반, 최신 뉴스 안정적으로 반환
+      const rssUrl = 'https://news.google.com/rss/search?q=' + encodedQuery + '&hl=en-US&gl=US&ceid=US:en';
       const response = UrlFetchApp.fetch(rssUrl, { muteHttpExceptions: true });
 
       if (response.getResponseCode() !== 200) {
-        Logger.log('Bing RSS 오류 (' + query + '): HTTP ' + response.getResponseCode());
+        Logger.log('Google News RSS 오류 (' + query + '): HTTP ' + response.getResponseCode());
         continue;
       }
 
@@ -102,18 +102,20 @@ function fetchNewsFromRSS() {
         const pub = new Date(pubDate);
         if (pub < twoDaysAgo) continue;
 
-        // Bing 리다이렉트 URL에서 실제 기사 URL 추출
-        // 형태: http://www.bing.com/news/apiclick.aspx?...&url=ENCODED_URL&...
-        const urlParam = rawLink.match(/[?&]url=([^&]+)/);
-        const link = urlParam ? decodeURIComponent(urlParam[1]) : rawLink;
+        // Google News RSS: <link>는 Google 리다이렉트 URL (그대로 사용 가능)
+        const link = rawLink;
 
-        // source: description 끝부분에서 추출 시도
-        const sourceMatch = description.match(/[-–]\s*([^-–<]{3,40})\s*$/);
-        const source = sourceMatch ? sourceMatch[1].trim() : (link.match(/^https?:\/\/(?:www\.)?([^\/]+)/) || ['', link])[1];
+        // source: Google News RSS는 <source> 태그에 언론사명 포함
+        const sourceEl = item.getChild('source');
+        const source = (sourceEl ? sourceEl.getText() : '') ||
+                       (description.match(/[-–]\s*([^-–<]{3,40})\s*$/) || ['',''])[1].trim() ||
+                       (link.match(/^https?:\/\/(?:www\.)?([^\/]+)/) || ['', link])[1];
 
         if (!title || articles.some(a => a.title === title)) continue;
         articles.push({ title, link, pubDate, source, query });
       }
+
+      Logger.log('Google News RSS (' + query + '): ' + items.length + '개 수집');
     } catch (e) {
       Logger.log('RSS 오류 (' + query + '): ' + e.message);
     }
