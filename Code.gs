@@ -89,18 +89,12 @@ function fetchNewsFromRSS() {
       if (!channel) continue;
       const items = channel.getChildren('item');
 
-      // 최근 48시간 기사 필터링 (여유있게)
-      const twoDaysAgo = new Date(Date.now() - 48 * 60 * 60 * 1000);
-
+      // Google News RSS는 자체적으로 최신 뉴스를 반환하므로 날짜 필터 불필요
       for (const item of items) {
         const title = item.getChildText('title') || '';
         const rawLink = item.getChildText('link') || '';
         const pubDate = item.getChildText('pubDate') || '';
         const description = item.getChildText('description') || '';
-
-        // pubDate 필터 (48시간 이내)
-        const pub = new Date(pubDate);
-        if (pub < twoDaysAgo) continue;
 
         // Google News RSS: <link>는 Google 리다이렉트 URL (그대로 사용 가능)
         const link = rawLink;
