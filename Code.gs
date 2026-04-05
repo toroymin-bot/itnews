@@ -3,6 +3,9 @@
 // 매일 아침 Top 3 AI/Data 뉴스를 한국어+영어로 이메일 발송
 // ============================================================
 
+// 테스트용 - GAS 기본 선택 함수 (맨 위 배치)
+function aaRunTest() { sendDailyNewsDigest(); }
+
 // API 키는 GAS Script Properties에 저장 (코드에 노출 방지)
 // 설정: GAS 에디터 → 프로젝트 설정 → 스크립트 속성 추가
 //   GEMINI_API_KEY  : Google AI Studio (aistudio.google.com/apikey)
@@ -378,8 +381,8 @@ function buildEmailHTML(articles, hasAudio) {
     </div>` : '';
 
   return `<html><head><meta charset="UTF-8"></head><body style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 700px; margin: 0 auto; color: #333;">
-    <div style="background: linear-gradient(135deg, #0078D4, #5C2D91); padding: 24px; border-radius: 12px 12px 0 0;">
-      <h1 style="color: white; margin: 0; font-size: 22px;">Daily AI &amp; Data News - Top 3 &nbsp;<span style="font-size: 13px; font-weight: normal; color: #000;">${today} | ${todayEn}</span></h1>
+    <div style="background: linear-gradient(135deg, #0078D4, #5C2D91); padding: 6px 12px; border-radius: 12px 12px 0 0;">
+      <p style="color: #000; margin: 0; font-size: 13px;">${today} | ${todayEn}</p>
     </div>
     ${audioBadge}
     ${newsHtml}
