@@ -3,7 +3,7 @@
 // 매일 아침 Top 3 AI/Data 뉴스를 한국어+영어로 이메일 발송
 // ============================================================
 
-const GEMINI_API_KEY = 'AIzaSyANYllMyXwEdxVs6ErPQiRrQbGVz46ISic';
+const GEMINI_API_KEY = PropertiesService.getScriptProperties().getProperty('GEMINI_API_KEY') || '';
 const RECIPIENT_EMAIL = 'toroymin@gmail.com';
 
 const SEARCH_QUERIES = [
