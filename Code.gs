@@ -21,49 +21,41 @@ const SEARCH_QUERIES = [
   'IT technology cloud computing',
 ];
 
-// 모델 우선순위 (최신순) - 없으면 자동으로 다음 모델 시도
+// 모델 우선순위 (최신순) - 직접 호출 시도
 const MODEL_PRIORITY = [
   'gemini-2.5-flash',
-  'gemini-2.5-pro',
   'gemini-2.0-flash',
-  'gemini-2.0-flash-lite',
   'gemini-1.5-flash',
-  'gemini-1.5-pro',
 ];
 
+// 실행당 한 번만 탐색
+let _cachedModel = undefined;
+
 // ============================================================
-// 사용 가능한 Gemini 모델 동적 조회
+// 사용 가능한 Gemini 모델 탐색 (모델 목록 API 없이 직접 ping)
 // ============================================================
 function getAvailableModel() {
-  try {
-    const url = 'https://generativelanguage.googleapis.com/v1beta/models?key=' + GEMINI_API_KEY;
-    const res = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
-    const models = JSON.parse(res.getContentText()).models || [];
-
-    // generateContent 지원 모델만 필터
-    const available = models
-      .filter(m => (m.supportedGenerationMethods || []).includes('generateContent'))
-      .map(m => m.name.replace('models/', ''));
-
-    Logger.log('사용 가능한 모델: ' + available.join(', '));
-
-    // 우선순위 기준으로 가장 좋은 모델 선택
-    for (const preferred of MODEL_PRIORITY) {
-      const match = available.find(a => a.includes(preferred));
-      if (match) {
-        Logger.log('선택된 모델: ' + match);
-        return match;
+  if (_cachedModel !== undefined) return _cachedModel;
+  const testPrompt = JSON.stringify({
+    contents: [{ parts: [{ text: 'hi' }] }],
+    generationConfig: { maxOutputTokens: 1 }
+  });
+  for (const model of MODEL_PRIORITY) {
+    try {
+      const url = 'https://generativelanguage.googleapis.com/v1beta/models/' + model + ':generateContent?key=' + GEMINI_API_KEY;
+      const res = UrlFetchApp.fetch(url, {
+        method: 'post', contentType: 'application/json',
+        payload: testPrompt, muteHttpExceptions: true
+      });
+      const json = JSON.parse(res.getContentText());
+      if (!json.error) {
+        Logger.log('선택된 모델: ' + model);
+        _cachedModel = model;
+        return model;
       }
-    }
-
-    // 우선순위에 없으면 첫 번째 사용 가능한 모델
-    if (available.length > 0) {
-      Logger.log('fallback 모델: ' + available[0]);
-      return available[0];
-    }
-  } catch (e) {
-    Logger.log('모델 목록 조회 실패: ' + e.message);
+    } catch (e) { /* 다음 모델 시도 */ }
   }
+  _cachedModel = null;
   return null;
 }
 
