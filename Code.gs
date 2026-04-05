@@ -21,43 +21,7 @@ const SEARCH_QUERIES = [
   'IT technology cloud computing',
 ];
 
-// 모델 우선순위 (최신순) - 직접 호출 시도
-const MODEL_PRIORITY = [
-  'gemini-2.5-flash',
-  'gemini-2.0-flash',
-  'gemini-1.5-flash',
-];
-
-// 실행당 한 번만 탐색
-let _cachedModel = undefined;
-
-// ============================================================
-// 사용 가능한 Gemini 모델 탐색 (모델 목록 API 없이 직접 ping)
-// ============================================================
-function getAvailableModel() {
-  if (_cachedModel !== undefined) return _cachedModel;
-  const testPrompt = JSON.stringify({
-    contents: [{ parts: [{ text: 'hi' }] }],
-    generationConfig: { maxOutputTokens: 1 }
-  });
-  for (const model of MODEL_PRIORITY) {
-    try {
-      const url = 'https://generativelanguage.googleapis.com/v1beta/models/' + model + ':generateContent?key=' + GEMINI_API_KEY;
-      const res = UrlFetchApp.fetch(url, {
-        method: 'post', contentType: 'application/json',
-        payload: testPrompt, muteHttpExceptions: true
-      });
-      const json = JSON.parse(res.getContentText());
-      if (!json.error) {
-        Logger.log('선택된 모델: ' + model);
-        _cachedModel = model;
-        return model;
-      }
-    } catch (e) { /* 다음 모델 시도 */ }
-  }
-  _cachedModel = null;
-  return null;
-}
+const GEMINI_MODEL = 'gemini-2.5-flash';
 
 // ============================================================
 // 메인 함수 - 트리거에 연결
@@ -163,7 +127,7 @@ function fetchNewsFromRSS() {
 // 카테고리: AI 1개, Azure Data Architecture 1개 (없으면 IT 일반), Data Engineering 1개
 // ============================================================
 function selectTop3WithGemini(allArticles) {
-  const model = getAvailableModel();
+  const model = GEMINI_API_KEY ? GEMINI_MODEL : null;
 
   // 카테고리별 분류
   const groups = { ai: [], azure: [], data: [], it: [] };
@@ -244,10 +208,10 @@ function selectTop3WithGemini(allArticles) {
 // Gemini API 요약 - 동적 모델 선택
 // ============================================================
 function generateDigestWithGemini(articles) {
-  const model = getAvailableModel();
+  const model = GEMINI_API_KEY ? GEMINI_MODEL : null;
 
   if (!model) {
-    Logger.log('사용 가능한 Gemini 모델 없음. 요약 없이 발송.');
+    Logger.log('GEMINI_API_KEY 없음. 요약 없이 발송.');
     return articles.map(a => ({
       ...a,
       summaryKo: a.title, summaryEn: a.title,
