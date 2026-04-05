@@ -195,12 +195,26 @@ function selectTop3WithGemini(allArticles) {
       return list[idx] || list[0];
     }).filter(Boolean);
 
+    // selected가 3개 미만이면 전체 기사에서 나머지 채우기
+    const usedTitles = new Set(selected.map(a => a.title));
+    for (const a of allArticles) {
+      if (selected.length >= 3) break;
+      if (!usedTitles.has(a.title)) { selected.push(a); usedTitles.add(a.title); }
+    }
+
     Logger.log('Gemini 선별 성공 (모델: ' + model + ')');
     return selected;
 
   } catch (e) {
     Logger.log('Gemini 선별 실패 → 단순 fallback: ' + e.message);
-    return [aiList[0], azureList[0], dataList[0]].filter(Boolean);
+    // fallback도 3개 채우기
+    const fb = [aiList[0], azureList[0], dataList[0]].filter(Boolean);
+    const usedFb = new Set(fb.map(a => a.title));
+    for (const a of allArticles) {
+      if (fb.length >= 3) break;
+      if (!usedFb.has(a.title)) { fb.push(a); usedFb.add(a.title); }
+    }
+    return fb;
   }
 }
 
