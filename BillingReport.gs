@@ -31,7 +31,7 @@ function sendBillingReport() {
     var today = Utilities.formatDate(new Date(), 'Asia/Seoul', 'yyyy-MM-dd');
     GmailApp.sendEmail(
       BR_RECIPIENT,
-      '[Cloud AI Billing] 비용 리포트 - ' + today,
+      '[IT News Google Cloud AI Billing] - ' + today,
       '',
       { htmlBody: html, name: 'Google Cloud Billing Bot', charset: 'UTF-8' }
     );
@@ -191,20 +191,8 @@ function buildBillingReportHTML(d) {
   var t = d.services['Cloud Text-to-Speech API'];
   var st = d.stats || {};
 
-  // ── Setup 안내 ──
+  // ── Setup 안내 (숨김) ──
   var setupMsg = '';
-  if (d.setupRequired || !d.hasBQData) {
-    var reason = d.setupRequired
-      ? 'BQ_BILLING_TABLE이 Script Properties에 설정되지 않았습니다.'
-      : (d.bqError ? 'BigQuery 오류: ' + d.bqError : '조회된 비용 데이터가 없습니다 (내보내기 활성화 후 최대 24시간 소요).');
-    setupMsg =
-      '<div style="background:#FFF8E1;border-left:4px solid #FFC107;padding:12px 16px;margin:0 0 0 0;font-size:12px;color:#856404;">' +
-      '<strong>&#x26A0;&#xFE0F; BigQuery 설정 필요</strong><br>' + reason + '<br><br>' +
-      '① Cloud Console → 결제 → 결제 내보내기 → BigQuery 활성화<br>' +
-      '② Script Properties: BQ_BILLING_TABLE = project.dataset.table<br>' +
-      '③ GAS 서비스(+)에서 BigQuery API 추가' +
-      '</div>';
-  }
 
   // ── Section 1: 기간별 누적 비용 (4 카드) ──
   var cards = [
@@ -213,18 +201,21 @@ function buildBillingReportHTML(d) {
     { label: '최근 30일',  sublabel: 'Last 30 days',  value: fmt(d.total.last30d, 4), color: '#5C2D91', icon: '&#x1F4CA;' },
     { label: '이번 달',    sublabel: 'Month-to-Date',  value: fmt(d.total.monthToDate, 4), color: '#D83B01', icon: '&#x1F4B0;' }
   ];
-  var cardHtml = '<table width="100%" cellpadding="0" cellspacing="0"><tr>';
-  cards.forEach(function (c) {
+  var cardHtml = '<table width="100%" cellpadding="0" cellspacing="0">';
+  for (var ci = 0; ci < cards.length; ci++) {
+    var c = cards[ci];
+    if (ci % 2 === 0) cardHtml += '<tr>';
     cardHtml +=
-      '<td style="width:25%;padding:4px 3px;" align="center">' +
-      '<div style="background:#fff;border:1px solid #E5E7EB;border-radius:8px;padding:10px 6px;text-align:center;border-top:3px solid ' + c.color + ';">' +
-      '<div style="font-size:16px;margin-bottom:2px;">' + c.icon + '</div>' +
-      '<div style="font-size:14px;font-weight:700;color:' + c.color + ';margin-bottom:1px;">' + c.value + '</div>' +
-      '<div style="font-size:10px;color:#374151;font-weight:600;">' + c.label + '</div>' +
-      '<div style="font-size:9px;color:#9CA3AF;">' + c.sublabel + '</div>' +
+      '<td style="width:50%;padding:3px 4px;" align="center">' +
+      '<div style="background:#fff;border:1px solid #E5E7EB;border-radius:8px;padding:10px 8px;text-align:center;border-top:3px solid ' + c.color + ';">' +
+      '<div style="font-size:15px;margin-bottom:2px;">' + c.icon + '</div>' +
+      '<div style="font-size:15px;font-weight:700;color:' + c.color + ';margin-bottom:1px;">' + c.value + '</div>' +
+      '<div style="font-size:11px;color:#374151;font-weight:600;">' + c.label + '</div>' +
+      '<div style="font-size:10px;color:#9CA3AF;">' + c.sublabel + '</div>' +
       '</div></td>';
-  });
-  cardHtml += '</tr></table>';
+    if (ci % 2 === 1) cardHtml += '</tr>';
+  }
+  cardHtml += '</table>';
 
   // ── Section 2: 서비스별 비용 (최근 30일) + 바 차트 ──
   var maxSvc = Math.max(g.last30d || 0, t.last30d || 0, 0.000001);
@@ -298,23 +289,16 @@ function buildBillingReportHTML(d) {
     '<div style="max-width:600px;margin:0 auto;background:#fff;border-radius:10px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">',
 
     // 헤더
-    '<div style="background:linear-gradient(135deg,#0078D4 0%,#005A9E 100%);padding:18px 20px;">',
-    '<table cellpadding="0" cellspacing="0"><tr>',
-    '<td style="padding-right:12px;vertical-align:middle;">',
-    '<div style="background:rgba(255,255,255,0.18);border-radius:10px;padding:8px 10px;font-size:22px;">&#x2601;&#xFE0F;</div>',
-    '</td>',
-    '<td style="vertical-align:middle;">',
-    '<div style="font-size:17px;font-weight:700;color:#fff;line-height:1.2;">Google Cloud AI Billing Bot</div>',
-    '<div style="font-size:11px;color:rgba(255,255,255,0.75);margin-top:3px;">' + BR_GCP_PROJECT + '</div>',
-    '<div style="font-size:10px;color:rgba(255,255,255,0.6);">' + d.reportTime + '</div>',
-    '</td></tr></table>',
+    '<div style="background:linear-gradient(135deg,#0078D4 0%,#005A9E 100%);padding:12px 16px;">',
+    '<div style="font-size:16px;font-weight:700;color:#fff;line-height:1.3;">Google Cloud AI Billing Bot</div>',
+    '<div style="font-size:11px;color:rgba(255,255,255,0.75);margin-top:2px;">' + BR_GCP_PROJECT + ' &bull; ' + d.reportTime + '</div>',
     '</div>',
 
     setupMsg,
 
     // Section 1
-    '<div style="padding:14px 12px 4px;">',
-    '<div style="font-size:12px;font-weight:700;color:#0078D4;letter-spacing:0.5px;margin-bottom:8px;">&#x1F4B3;&nbsp; 기간별 누적 비용</div>',
+    '<div style="padding:8px 12px 4px;">',
+    '<div style="font-size:12px;font-weight:700;color:#0078D4;letter-spacing:0.5px;margin-bottom:6px;">&#x1F4B3;&nbsp; 기간별 누적 비용</div>',
     cardHtml,
     '</div>',
 
