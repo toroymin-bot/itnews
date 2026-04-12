@@ -71,11 +71,13 @@ function sendDailyNewsDigest() {
 // ============================================================
 function fetchNewsFromRSS() {
   const articles = [];
+  const now = new Date();
+  const cutoff24h = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+  const cutoff48h = new Date(now.getTime() - 48 * 60 * 60 * 1000);
 
   for (const query of SEARCH_QUERIES) {
     try {
       const encodedQuery = encodeURIComponent(query);
-      // Google News RSS: 검색어 기반, 최신 뉴스 안정적으로 반환
       const rssUrl = 'https://news.google.com/rss/search?q=' + encodedQuery + '&hl=en-US&gl=US&ceid=US:en';
       const response = UrlFetchApp.fetch(rssUrl, { muteHttpExceptions: true });
 
@@ -89,31 +91,49 @@ function fetchNewsFromRSS() {
       if (!channel) continue;
       const items = channel.getChildren('item');
 
-      // Google News RSS는 자체적으로 최신 뉴스를 반환하므로 날짜 필터 불필요
+      let added = 0;
       for (const item of items) {
         const title = item.getChildText('title') || '';
         const rawLink = item.getChildText('link') || '';
         const pubDate = item.getChildText('pubDate') || '';
         const description = item.getChildText('description') || '';
-
-        // Google News RSS: <link>는 Google 리다이렉트 URL (그대로 사용 가능)
         const link = rawLink;
 
-        // source: Google News RSS는 <source> 태그에 언론사명 포함
         const sourceEl = item.getChild('source');
         const source = (sourceEl ? sourceEl.getText() : '') ||
                        (description.match(/[-–]\s*([^-–<]{3,40})\s*$/) || ['',''])[1].trim() ||
                        (link.match(/^https?:\/\/(?:www\.)?([^\/]+)/) || ['', link])[1];
 
         if (!title || articles.some(a => a.title === title)) continue;
-        articles.push({ title, link, pubDate, source, query });
+
+        // pubDate 파싱 (RSS RFC-822 형식: "Mon, 06 Apr 2026 10:00:00 GMT")
+        const articleDate = pubDate ? new Date(pubDate) : null;
+        const validDate = articleDate && !isNaN(articleDate.getTime());
+
+        // 48시간 이내 기사만 수집 (날짜 없는 기사는 포함)
+        if (validDate && articleDate < cutoff48h) continue;
+
+        const within24h = !validDate || articleDate >= cutoff24h;
+        articles.push({ title, link, pubDate, source, query, articleDate: validDate ? articleDate : null, within24h });
+        added++;
       }
 
-      Logger.log('Google News RSS (' + query + '): ' + items.length + '개 수집');
+      Logger.log('Google News RSS (' + query + '): ' + items.length + '개 중 ' + added + '개 수집 (48h 이내)');
     } catch (e) {
       Logger.log('RSS 오류 (' + query + '): ' + e.message);
     }
   }
+
+  // 최신 기사 우선 정렬
+  articles.sort((a, b) => {
+    if (!a.articleDate && !b.articleDate) return 0;
+    if (!a.articleDate) return 1;
+    if (!b.articleDate) return -1;
+    return b.articleDate - a.articleDate;
+  });
+
+  const within24hCount = articles.filter(a => a.within24h).length;
+  Logger.log('총 수집: ' + articles.length + '개 (24h 이내: ' + within24hCount + '개, 24~48h: ' + (articles.length - within24hCount) + '개)');
 
   return articles;
 }
@@ -151,11 +171,15 @@ function selectTop3WithGemini(allArticles) {
     return [aiList[0], azureList[0], dataList[0]].filter(Boolean);
   }
 
-  const fmt = (arr) => arr.map((a, i) => i + '. "' + a.title + '" (' + (a.source || '') + ')').join('\n');
+  const fmt = (arr) => arr.map((a, i) => {
+    const age = a.articleDate ? Math.round((Date.now() - a.articleDate.getTime()) / 3600000) + 'h ago' : 'unknown date';
+    return i + '. "' + a.title + '" (' + (a.source || '') + ', ' + age + ')';
+  }).join('\n');
 
   const prompt =
     'You are a tech news curator for a Data Engineer.\n' +
     'From each category below, select the SINGLE most important article.\n' +
+    'IMPORTANT: Strongly prefer articles published within the last 24 hours. Only pick older articles if no recent ones are available.\n' +
     'Prefer technical depth and industry impact. Avoid marketing/ads.\n\n' +
     '[Category 1: AI]\n' + fmt(aiList) + '\n\n' +
     '[Category 2: Azure Data Architecture]\n' + fmt(azureList) + '\n\n' +
